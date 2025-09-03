@@ -1,0 +1,26 @@
+{
+  "name": "Ukoo wa ALLY NDOILE MKILINDI",
+  "short_name": "UkooFamily",
+  "description": "App ya kuona na kusimamia mti wa familia ya ALLY NDOILE MKILINDI",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#166534",
+  "icons": [
+    {
+      "src": "android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

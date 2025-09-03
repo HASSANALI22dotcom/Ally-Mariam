@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏡 Ukoo wa ALLY NDOILE MKILINDI</title>
+
+  <!-- Manifest + Icons -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#166534">
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
+  <style>
+    body {
+      font-family: 'Georgia', serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      padding: 20px;
+    }
+    h1, h2 { text-align: center; }
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+    form input, form select, form button {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+    }
+    form button {
+      background: #166534;
+      color: white;
+      cursor: pointer;
+      border: none;
+      transition: 0.3s;
+    }
+    form button:hover { background: #1e40af; }
+    #tree-container { text-align:center; }
+    .tree-node {
+      background: #f3f4f6;
+      border: 2px solid #166534;
+      border-radius: 10px;
+      padding: 10px 15px;
+      min-width: 120px;
+      text-align: center;
+      position: relative;
+      margin: auto;
+    }
+    .tree-node .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #166534, #1e40af);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 5px;
+      font-weight: bold;
+    }
+    .tree-children { display:flex; justify-content:center; gap:20px; margin-top:15px; }
+    .stats { display:flex; justify-content:center; gap:20px; margin-top:20px; }
+    .stat-card {
+      background:white;
+      padding:15px;
+      border-radius:10px;
+      text-align:center;
+      box-shadow:0 3px 6px rgba(0,0,0,0.1);
+      min-width:100px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏡 Ukoo wa ALLY NDOILE MKILINDI</h1>
+
+    <form id="signup-form">
+      <h2>📝 Jiandikishe Mwanaukoo</h2>
+      <input type="text" id="name" placeholder="Jina Kamili" required>
+      <select id="role" required>
+        <option value="">Chagua Nafasi</option>
+        <option value="Baba">Baba</option>
+        <option value="Mama">Mama</option>
+        <option value="Mtoto">Mtoto</option>
+      </select>
+      <select id="parent" required>
+        <option value="">Chagua mzazi / parent</option>
+      </select>
+      <button type="submit">➕ Ongeza Mwanaukoo</button>
+    </form>
+
+    <div class="stats">
+      <div class="stat-card"><span id="total-members">0</span><br>Wanafamilia</div>
+      <div class="stat-card"><span id="total-grandchildren">0</span><br>Wajukuu</div>
+    </div>
+
+    <section id="tree">
+      <h2>🌳 Mti wa Familia</h2>
+      <div id="tree-container"></div>
+    </section>
+  </div>
+
+  <script>
+    // Initial family tree
+    let familyTree = {
+      id: 1,
+      name: "ALLY NDOILE MKILINDI",
+      role: "Mzazi Mkuu",
+      children: []
+    };
+
+    // Function to render tree recursively
+    function renderTree(person) {
+      const node = document.createElement('div');
+      node.classList.add('tree-node');
+      node.innerHTML = `
+        <div class="avatar">${person.name[0]}</div>
+        <strong>${person.name}</strong><br>
+        <small>${person.role}</small>
+        ${person.children && person.children.length ? `<div class="tree-children"></div>` : ''}
+      `;
+      if(person.children && person.children.length){
+        const childrenContainer = node.querySelector('.tree-children');
+        person.children.forEach(child=>{
+          childrenContainer.appendChild(renderTree(child));
+        });
+      }
+      return node;
+    }
+
+    // Function to find parent by id
+    function findParent(node, id){
+      if(node.id == id) return node;
+      if(node.children){
+        for(let c of node.children){
+          const res = findParent(c,id);
+          if(res) return res;
+        }
+      }
+      return null;
+    }
+
+    // Update parent dropdown
+    function updateParentOptions(){
+      const parentSelect = document.getElementById('parent');
+      parentSelect.innerHTML = '<option value="">Chagua mzazi / parent</option>';
+      function addOptions(node, prefix=''){
+        parentSelect.innerHTML += `<option value="${node.id}">${prefix}${node.name} (${node.role})</option>`;
+        if(node.children){
+          node.children.forEach(c=> addOptions(c, prefix+'--'));
+        }
+      }
+      addOptions(familyTree);
+    }
+
+    // Update stats
+    function updateStats(){
+      const totalMembers = countMembers(familyTree);
+      const totalGrandchildren = countGrandchildren(familyTree);
+      document.getElementById('total-members').innerText = totalMembers;
+      document.getElementById('total-grandchildren').innerText = totalGrandchildren;
+    }
+
+    // Count total members recursively
+    function countMembers(node){
+      let count = 1;
+      if(node.children) node.children.forEach(c=> count+=countMembers(c));
+      return count;
+    }
+
+    // Count grandchildren
+    function countGrandchildren(node){
+      let count = 0;
+      if(node.children){
+        node.children.forEach(c=>{
+          count += c.children ? c.children.length : 0;
+          count += countGrandchildren(c);
+        });
+      }
+      return count;
+    }
+
+    // Add new member
+    document.getElementById('signup-form').addEventListener('submit',function(e){
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const role = document.getElementById('role').value;
+      const parentId = parseInt(document.getElementById('parent').value);
+      if(!name || !role || !parentId) return alert('Jaza taarifa zote');
+      const parentNode = findParent(familyTree, parentId);
+      const newId = Date.now();
+      parentNode.children.push({id:newId,name,role,children:[]});
+      document.getElementById('tree-container').innerHTML='';
+      document.getElementById('tree-container').appendChild(renderTree(familyTree));
+      updateParentOptions();
+      updateStats();
+      this.reset();
+    });
+
+    // Initial render
+    document.getElementById('tree-container').appendChild(renderTree(familyTree));
+    updateParentOptions();
+    updateStats();
+  </script>
+
+  <!-- Service Worker Registration -->
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('✅ Service Worker Registered'))
+      .catch(err => console.error('❌ SW registration failed:', err));
+  }
+  </script>
+</body>
+</html>

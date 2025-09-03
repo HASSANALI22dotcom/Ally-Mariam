@@ -4,14 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🏡 Ukoo wa ALLY NDOILE MKILINDI</title>
-
-<!-- SEO & PWA Extended Description -->
-<meta name="description" content="App ya kusimamia na kuonyesha mti wa familia ya ALLY NDOILE MKILINDI. Onyesha vizazi, wanafamilia, wajukuu, na mahusiano ya ndoa. Upload photo, tuma messages na angalia stats.">
-<meta name="keywords" content="family tree, ukoo, ALLY NDOILE MKILINDI, watoto, spouse, photos, chat, PWA">
-<meta name="author" content="ALLY NDOILE MKILINDI">
+<meta name="description" content="App ya kusimamia mti wa familia ya ALLY NDOILE MKILINDI. Onyesha vizazi vyote vya familia kwa mtindo wa mti: wanaukoo, wajukuu, wanafamilia wote, pamoja na mahusiano ya ndoa (spouse). Upload photo kwa kila mwanaukoo, tuma ujumbe wa mawasiliano, angalia stats za familia (idadi ya wanaukoo, wajukuu), na chunguza mawasiliano ya mtandaoni. App hii ni PWA tayari kwa offline, inasaidia caching kupitia service worker, na inaweza kuinstall kama app kwenye simu au desktop.">
 <meta name="theme-color" content="#166534">
-
-<!-- Manifest + Icons -->
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -39,7 +33,6 @@ form button:hover { background:#1e40af; }
 <div class="container">
 <h1>🏡 Ukoo wa ALLY NDOILE MKILINDI</h1>
 
-<!-- Registration Form -->
 <form id="signup-form">
 <h2>📝 Jiandikishe Mwanaukoo</h2>
 <input type="text" id="name" placeholder="Jina Kamili" required>
@@ -57,19 +50,16 @@ form button:hover { background:#1e40af; }
 <button type="submit">➕ Ongeza Mwanaukoo</button>
 </form>
 
-<!-- Stats -->
 <div class="stats">
 <div class="stat-card"><span id="total-members">0</span><br>Wanafamilia</div>
 <div class="stat-card"><span id="total-grandchildren">0</span><br>Wajukuu</div>
 </div>
 
-<!-- Family Tree -->
 <section id="tree">
 <h2>🌳 Mti wa Familia</h2>
 <div id="tree-container"></div>
 </section>
 
-<!-- Communication -->
 <section id="communication">
 <h2>📱 Mawasiliano</h2>
 <div id="messages"></div>
@@ -80,124 +70,72 @@ form button:hover { background:#1e40af; }
 </div>
 
 <script>
-// Initial family tree
-let familyTree = {
-id:1,
-name:"ALLY NDOILE MKILINDI",
-role:"Mzazi Mkuu",
-spouse:"MARIAMU MKILINDI", // Updated spouse
-children:[]
+// ===== IndexedDB Setup =====
+let db;
+const request = indexedDB.open("ukooDB", 1);
+request.onupgradeneeded = function(event) {
+  db = event.target.result;
+  db.createObjectStore("members", { keyPath: "id" }).createIndex("name", "name", { unique:false });
+  db.createObjectStore("messages", { keyPath: "time" });
 };
+request.onsuccess = function(event){ db=event.target.result; loadMembers(); loadMessages(); updateStatsDB(); };
+request.onerror = function(event){ console.error("IndexedDB error:", event.target.errorCode); };
 
-// Recursive tree render
-function renderTree(person){
-  const node=document.createElement('div');
-  node.classList.add('tree-node');
-  const avatarHTML = person.photo
-    ? `<img src="${person.photo}" alt="${person.name}" class="avatar">`
-    : `<div class="avatar">${person.name[0]}</div>`;
-  node.innerHTML = `
-    ${avatarHTML}
-    <strong>${person.name}</strong><br>
-    <small>${person.role}</small>
-    ${person.spouse ? `<br><small>Ameolewa/Ameoa: ${person.spouse}</small>` : ''}
-    ${person.children && person.children.length ? `<div class="tree-children"></div>` : ''}
-  `;
-  if(person.children && person.children.length){
-    const childrenContainer=node.querySelector('.tree-children');
-    person.children.forEach(child => { childrenContainer.appendChild(renderTree(child)); });
-  }
-  return node;
-}
+// ===== Family Tree Functions =====
+function addMemberToDB(member){ const tx=db.transaction("members","readwrite"); const store=tx.objectStore("members"); store.put(member); tx.oncomplete=()=>{ renderTreeFromDB(); updateStatsDB(); }; }
+function loadMembers(){ const tx=db.transaction("members","readonly"); const store=tx.objectStore("members"); store.getAll().onsuccess=()=>{ renderTreeFromDB(); updateStatsDB(); }; }
+function renderTreeFromDB(){ const tx=db.transaction("members","readonly"); const store=tx.objectStore("members"); store.getAll().onsuccess=e=>{ const members=e.target.result; const treeContainer=document.getElementById('tree-container'); treeContainer.innerHTML=''; const root=members.find(m=>m.role==="Mzazi Mkuu"); if(root) treeContainer.appendChild(createNode(root,members)); }; }
+function createNode(member,allMembers){ const node=document.createElement('div'); node.classList.add('tree-node'); const avatarHTML=member.photo?`<img src="${member.photo}" alt="${member.name}" class="avatar">`:`<div class="avatar">${member.name[0]}</div>`; node.innerHTML=`${avatarHTML}<strong>${member.name}</strong><br><small>${member.role}</small>${member.spouse?`<br><small>Ameolewa/Ameoa: ${member.spouse}</small>`:''}<div class="tree-children"></div>`; const childrenContainer=node.querySelector('.tree-children'); const children=allMembers.filter(m=>m.parentId===member.id); children.forEach(child=>childrenContainer.appendChild(createNode(child,allMembers))); return node; }
 
-// Find parent
-function findParent(node,id){
-  if(node.id==id) return node;
-  if(node.children) for(let c of node.children){ const res=findParent(c,id); if(res) return res; }
-  return null;
-}
+// ===== Stats =====
+function updateStatsDB(){ const tx=db.transaction("members","readonly"); const store=tx.objectStore("members"); store.getAll().onsuccess=e=>{ const members=e.target.result; document.getElementById('total-members').innerText=members.length; const grandchildrenCount=members.reduce((acc,m)=>{ const children=members.filter(c=>c.parentId===m.id); acc+=children.reduce((cAcc,cChild)=>{ cAcc+=members.filter(g=>g.parentId===cChild.id).length; return cAcc; },0); return acc; },0); document.getElementById('total-grandchildren').innerText=grandchildrenCount; }; }
 
-// Update parent dropdown
-function updateParentOptions(){
-  const parentSelect=document.getElementById('parent');
-  parentSelect.innerHTML='<option value="">Chagua mzazi / parent</option>';
-  function addOptions(node,prefix=''){
-    parentSelect.innerHTML+=`<option value="${node.id}">${prefix}${node.name} (${node.role})</option>`;
-    if(node.children) node.children.forEach(c=>addOptions(c,prefix+'--'));
-  }
-  addOptions(familyTree);
-}
-
-// Stats
-function updateStats(){
-  document.getElementById('total-members').innerText=countMembers(familyTree);
-  document.getElementById('total-grandchildren').innerText=countGrandchildren(familyTree);
-}
-function countMembers(node){let count=1;if(node.children)node.children.forEach(c=>count+=countMembers(c));return count;}
-function countGrandchildren(node){let count=0;if(node.children){node.children.forEach(c=>{count+=c.children?c.children.length:0;count+=countGrandchildren(c);});}return count;}
-
-// Add new member
+// ===== Add New Member =====
 document.getElementById('signup-form').addEventListener('submit',function(e){
-  e.preventDefault();
-  const name=document.getElementById('name').value.trim();
-  const spouse=document.getElementById('spouse').value.trim();
-  const role=document.getElementById('role').value;
-  const parentId=parseInt(document.getElementById('parent').value);
-  const photoFile=document.getElementById('photo').files[0];
-  const photoURL = photoFile ? URL.createObjectURL(photoFile) : null;
-  if(!name || !role || !parentId) return alert('Jaza taarifa zote');
-  const parentNode=findParent(familyTree,parentId);
-  const newId=Date.now();
-  parentNode.children.push({id:newId,name,role,spouse,photo:photoURL,children:[]});
-  document.getElementById('tree-container').innerHTML='';
-  document.getElementById('tree-container').appendChild(renderTree(familyTree));
-  updateParentOptions();
-  updateStats();
-  this.reset();
+e.preventDefault(); const name=document.getElementById('name').value.trim(); const spouse=document.getElementById('spouse').value.trim(); const role=document.getElementById('role').value; const parentId=parseInt(document.getElementById('parent').value); const photoFile=document.getElementById('photo').files[0]; const photoURL=photoFile?URL.createObjectURL(photoFile):null; if(!name||!role||(role!=="Mzazi Mkuu"&&!parentId)) return alert("Jaza taarifa zote"); const newMember={id:Date.now(), name, role, spouse, parentId:role==="Mzazi Mkuu"?null:parentId, photo:photoURL}; addMemberToDB(newMember); this.reset(); updateParentOptionsDB(); });
+
+// ===== Parent Dropdown =====
+function updateParentOptionsDB(){ const parentSelect=document.getElementById('parent'); parentSelect.innerHTML='<option value="">Chagua mzazi / parent</option>'; const tx=db.transaction("members","readonly"); const store=tx.objectStore("members"); store.getAll().onsuccess=e=>{ const members=e.target.result; function addOptions(member,prefix=''){ parentSelect.innerHTML+=`<option value="${member.id}">${prefix}${member.name} (${member.role})</option>`; const children=members.filter(m=>m.parentId===member.id); children.forEach(c=>addOptions(c,prefix+'--')); } const root=members.find(m=>m.role==="Mzazi Mkuu"); if(root) addOptions(root); }; }
+
+// ===== Chat Messages =====
+function loadMessages(){ const tx=db.transaction("messages","readonly"); const store=tx.objectStore("messages"); store.getAll().onsuccess=e=>{ const msgs=e.target.result; const messagesDiv=document.getElementById(messagesDiv.innerHTML=''; 
+    msgs.sort((a,b)=>a.time-b.time); // sort by time
+    msgs.forEach(msgObj=>{
+        const div=document.createElement('div');
+        div.style.padding="5px"; div.style.marginBottom="5px"; div.style.background="#e5e7eb"; div.style.borderRadius="5px";
+        div.textContent="You: "+msgObj.text;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight; // auto scroll
+    });
+}
+
+document.getElementById('sendMsgBtn').addEventListener('click', ()=>{
+    const msgInput=document.getElementById('msgInput');
+    const msg=msgInput.value.trim();
+    if(!msg) return;
+    const tx=db.transaction("messages","readwrite");
+    const store=tx.objectStore("messages");
+    store.put({time:Date.now(), text:msg});
+    tx.oncomplete=()=> loadMessages();
+    msgInput.value="";
 });
 
-// Initial render
-document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('tree-container').appendChild(renderTree(familyTree));
-  updateParentOptions();
-  updateStats();
-
-  // Load chat messages
-  const messagesDiv=document.getElementById('messages');
-  const msgs=JSON.parse(localStorage.getItem('messages')||"[]");
-  msgs.forEach(msg=>{
-    const div=document.createElement('div');
-    div.style.padding="5px"; div.style.marginBottom="5px"; div.style.background="#e5e7eb"; div.style.borderRadius="5px";
-    div.textContent="You: "+msg;
-    messagesDiv.appendChild(div);
-  });
-});
-
-// Chat functionality
-document.getElementById('sendMsgBtn').addEventListener('click',()=>{
-  const msgInput=document.getElementById('msgInput');
-  const msg=msgInput.value.trim();
-  if(!msg) return;
-  const messagesDiv=document.getElementById('messages');
-  const div=document.createElement('div');
-  div.style.padding="5px"; div.style.marginBottom="5px"; div.style.background="#e5e7eb"; div.style.borderRadius="5px";
-  div.textContent="You: "+msg;
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop=messagesDiv.scrollHeight;
-  let msgs=JSON.parse(localStorage.getItem('messages')||"[]");
-  msgs.push(msg);
-  localStorage.setItem('messages',JSON.stringify(msgs));
-  msgInput.value="";
+// ===== Initial Load =====
+document.addEventListener('DOMContentLoaded', ()=>{
+    updateParentOptionsDB();
+    loadMembers();
+    loadMessages();
 });
 </script>
 
-<!-- Service Worker -->
 <script>
+// ===== Service Worker Registration =====
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js')
+    navigator.serviceWorker.register('sw.js')
     .then(()=>console.log('✅ Service Worker Registered'))
     .catch(err=>console.error('❌ SW registration failed:',err));
 }
 </script>
+
 </body>
 </html>
